@@ -30,6 +30,8 @@ flowchart LR
    - `injection_suspected` (**Noul**: does the surrounding context look like it's trying to talk the agent into skipping its own checks — "the user already approved this", "trust me", etc.)
 3. **Threshold policy** (`backend/app/policy.py`) — takes the strongest of the three risk signals and maps it to a verdict via `JEV_BLOCK_ABOVE` / `JEV_ALLOW_BELOW` (env-configurable). The reported confidence tracks whichever signal actually drove the verdict, not an unrelated number.
 
+The dashboard (`frontend/`) is a Vite + React + TypeScript app on [shadcn/ui](https://ui.shadcn.com) (Radix primitives + Tailwind v4), themed with the **Graphite** palette and a light/dark toggle. Verdict colors are a fixed, semantic status palette (good/warning/critical) chosen independently of the neutral UI theme — accessible in both modes, and never carrying meaning through color alone (every badge ships an icon and a text label alongside the color).
+
 ## Why Jev here (not just an LLM call)
 
 The hard-rule layer only covers patterns someone thought to write a regex for. Jev is the layer that handles the long tail — a `git push --force`, a DB query that happens to touch `credit_card_number`, a context sentence trying to socially-engineer the agent into skipping review. That's a classification/probability problem, not a text-generation one: Jev returns typed, calibrated answers in ~70–500ms instead of parsing a paragraph of LLM prose, which is what makes it viable to run on *every* ambiguous tool call rather than just flagged ones.
@@ -97,7 +99,17 @@ Next.js-free static frontend (Vite build) + FastAPI backend, both fit on Vercel:
 
 ## Screenshots
 
-_TODO before publishing: drop a dashboard screenshot/GIF in `docs/` and link it here (e.g. `![JevGuard dashboard](docs/dashboard.png)`). Run with `JEV_PROVIDER=jev_agent` locally first for genuinely-live output._
+**Dashboard** — stat tiles, tabbed demo scenarios, live decision panel with confidence bar, verdict distribution + decision log:
+
+![JevGuard dashboard](docs/dashboard.png)
+
+**Raw Jev answers**, expanded — the actual typed `Choice` response (options, probabilities, confidence) the policy decided on:
+
+![Decision detail with raw Jev answers](docs/decision-detail.png)
+
+**Light mode:**
+
+![JevGuard dashboard, light mode](docs/dashboard-light.png)
 
 ## Limitations
 

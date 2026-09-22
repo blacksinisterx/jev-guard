@@ -1,48 +1,84 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Info, Loader2, Moon, ShieldCheck, Sun } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { StatusBadge, type Verdict } from "@/components/status-badge";
+import { StatTile } from "@/components/stat-tile";
+import { VerdictDistribution } from "@/components/verdict-distribution";
+import { useTheme } from "@/lib/use-theme";
 import { evaluateAction, getDecisions, getExamples } from "./api";
 import type { ActionRequest, DemoExample, EvaluationResult } from "./types";
 
-const VERDICT_STYLE: Record<string, string> = {
-  allow: "bg-emerald-100 text-emerald-800 border-emerald-300",
-  review: "bg-amber-100 text-amber-800 border-amber-300",
-  block: "bg-red-100 text-red-800 border-red-300",
-};
-
-function VerdictBadge({ verdict }: { verdict: string }) {
+function ThemeToggle() {
+  const { theme, toggle } = useTheme();
   return (
-    <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold border ${VERDICT_STYLE[verdict] ?? ""}`}>
-      {verdict.toUpperCase()}
-    </span>
+    <Button variant="outline" size="icon" onClick={toggle} aria-label="Toggle theme">
+      {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+    </Button>
   );
 }
 
-function ResultPanel({ result }: { result: EvaluationResult }) {
+function ResultCard({ result }: { result: EvaluationResult }) {
+  const confidencePct = Math.round(result.confidence * 100);
   return (
-    <div className="border rounded-lg p-5 bg-white shadow-sm space-y-3">
-      <div className="flex items-center justify-between">
-        <VerdictBadge verdict={result.verdict} />
-        <span className="text-xs text-gray-500">
-          {result.source === "rule" ? "decided by hard rule" : `decided by Jev (${result.provider})`}
-        </span>
-      </div>
-      <p className="text-gray-800">{result.reason}</p>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-600">
-        <dt>Confidence</dt>
-        <dd>{(result.confidence * 100).toFixed(1)}%</dd>
-        <dt>Latency</dt>
-        <dd>{result.latency_ms.toFixed(2)} ms</dd>
-        <dt>Cost estimate</dt>
-        <dd>${result.cost_estimate_usd.toFixed(8)}</dd>
-        <dt>Tool</dt>
-        <dd className="font-mono">{result.action.tool}</dd>
-      </dl>
-      {Object.keys(result.raw_answers).length > 0 && (
-        <details className="text-xs text-gray-500">
-          <summary className="cursor-pointer">raw Jev answers</summary>
-          <pre className="mt-1 overflow-x-auto">{JSON.stringify(result.raw_answers, null, 2)}</pre>
-        </details>
-      )}
-    </div>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Latest decision</CardTitle>
+          <StatusBadge verdict={result.verdict} />
+        </div>
+        <CardDescription>
+          {result.source === "rule" ? "Decided by the hard-rule prefilter" : `Decided by Jev (${result.provider})`}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm">{result.reason}</p>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Confidence</span>
+            <span className="font-mono text-foreground">{confidencePct}%</span>
+          </div>
+          <Progress value={confidencePct} />
+        </div>
+
+        <dl className="grid grid-cols-3 gap-3 text-xs">
+          <div>
+            <dt className="text-muted-foreground">Latency</dt>
+            <dd className="font-mono text-foreground">{result.latency_ms.toFixed(2)} ms</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Cost</dt>
+            <dd className="font-mono text-foreground">${result.cost_estimate_usd.toFixed(8)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Tool</dt>
+            <dd className="font-mono text-foreground truncate">{result.action.tool}</dd>
+          </div>
+        </dl>
+
+        {Object.keys(result.raw_answers).length > 0 && (
+          <Accordion type="single" collapsible>
+            <AccordionItem value="raw" className="border-none">
+              <AccordionTrigger className="text-xs text-muted-foreground">Raw Jev answers</AccordionTrigger>
+              <AccordionContent>
+                <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">
+                  {JSON.stringify(result.raw_answers, null, 2)}
+                </pre>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -52,11 +88,13 @@ export default function App() {
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [provider, setProvider] = useState<string>("mock");
   const [custom, setCustom] = useState({ tool: "shell", params: '{"command": ""}', context: "" });
 
   useEffect(() => {
     getExamples().then(setExamples).catch(() => {});
     getDecisions().then(setDecisions).catch(() => {});
+    fetch("/api/health").then((r) => r.json()).then((d) => setProvider(d.provider)).catch(() => {});
   }, []);
 
   async function runAction(action: ActionRequest) {
@@ -84,114 +122,184 @@ export default function App() {
     runAction({ tool: custom.tool, params, context: custom.context || null });
   }
 
-  const grouped = examples.reduce<Record<string, DemoExample[]>>((acc, ex) => {
-    (acc[ex.category] ??= []).push(ex);
-    return acc;
-  }, {});
+  const grouped = useMemo(
+    () =>
+      examples.reduce<Record<string, DemoExample[]>>((acc, ex) => {
+        (acc[ex.category] ??= []).push(ex);
+        return acc;
+      }, {}),
+    [examples],
+  );
+  const categories = Object.keys(grouped);
+
+  const stats = useMemo(() => {
+    const total = decisions.length;
+    const counts: Record<Verdict, number> = { allow: 0, review: 0, block: 0 };
+    let latencySum = 0;
+    let confidenceSum = 0;
+    for (const d of decisions) {
+      counts[d.verdict]++;
+      latencySum += d.latency_ms;
+      confidenceSum += d.confidence;
+    }
+    return {
+      total,
+      counts,
+      blockRate: total ? (counts.block / total) * 100 : 0,
+      avgLatency: total ? latencySum / total : 0,
+      avgConfidence: total ? (confidenceSum / total) * 100 : 0,
+    };
+  }, [decisions]);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="border-b bg-white px-6 py-4">
-        <h1 className="text-xl font-bold">JevGuard</h1>
-        <p className="text-sm text-gray-500">A security decision layer for AI agents — agent proposes an action, Jev decides allow / review / block.</p>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-6 py-8 grid md:grid-cols-2 gap-8">
-        <section className="space-y-6">
-          <div>
-            <h2 className="font-semibold mb-2">Try a demo action</h2>
-            {Object.entries(grouped).map(([category, items]) => (
-              <div key={category} className="mb-3">
-                <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">{category}</p>
-                <div className="flex flex-wrap gap-2">
-                  {items.map((ex, i) => (
-                    <button
-                      key={i}
-                      onClick={() => runAction(ex.action)}
-                      disabled={loading}
-                      className="text-sm px-3 py-1.5 rounded border bg-white hover:bg-gray-100 disabled:opacity-50 font-mono"
-                    >
-                      {ex.action.tool}: {JSON.stringify(ex.action.params).slice(0, 40)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div>
-            <h2 className="font-semibold mb-2">Or propose your own</h2>
-            <div className="space-y-2 bg-white border rounded-lg p-4">
-              <input
-                className="w-full border rounded px-2 py-1 text-sm font-mono"
-                value={custom.tool}
-                onChange={(e) => setCustom({ ...custom, tool: e.target.value })}
-                placeholder="tool name"
-              />
-              <textarea
-                className="w-full border rounded px-2 py-1 text-sm font-mono"
-                rows={2}
-                value={custom.params}
-                onChange={(e) => setCustom({ ...custom, params: e.target.value })}
-                placeholder='{"command": "..."}'
-              />
-              <textarea
-                className="w-full border rounded px-2 py-1 text-sm"
-                rows={2}
-                value={custom.context}
-                onChange={(e) => setCustom({ ...custom, context: e.target.value })}
-                placeholder="optional surrounding context"
-              />
-              <button
-                onClick={runCustom}
-                disabled={loading}
-                className="px-4 py-1.5 rounded bg-gray-900 text-white text-sm disabled:opacity-50"
-              >
-                Evaluate
-              </button>
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="border-b">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="size-6 text-primary" />
+            <div>
+              <h1 className="text-lg font-semibold leading-tight">JevGuard</h1>
+              <p className="text-xs text-muted-foreground">A security decision layer for AI agents</p>
             </div>
           </div>
+          <div className="flex items-center gap-3">
+            <span className="rounded-full border px-2.5 py-1 font-mono text-xs text-muted-foreground">
+              provider: {provider}
+            </span>
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {result && <ResultPanel result={result} />}
-        </section>
+      <main className="mx-auto max-w-6xl space-y-6 px-6 py-8">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <StatTile label="Decisions" value={String(stats.total)} />
+          <StatTile label="Block rate" value={`${stats.blockRate.toFixed(0)}%`} />
+          <StatTile label="Avg latency" value={`${stats.avgLatency.toFixed(1)} ms`} />
+          <StatTile label="Avg confidence" value={`${stats.avgConfidence.toFixed(0)}%`} />
+        </div>
 
-        <section>
-          <h2 className="font-semibold mb-2">Recent decisions</h2>
-          <div className="bg-white border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100 text-left">
-                <tr>
-                  <th className="px-3 py-2">Verdict</th>
-                  <th className="px-3 py-2">Tool</th>
-                  <th className="px-3 py-2">Source</th>
-                  <th className="px-3 py-2">Confidence</th>
-                  <th className="px-3 py-2">Latency</th>
-                </tr>
-              </thead>
-              <tbody>
+        <div className="grid gap-6 lg:grid-cols-5">
+          <div className="space-y-6 lg:col-span-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>Try a demo action</CardTitle>
+                <CardDescription>Seeded scenarios covering the categories JevGuard is meant to catch.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue={categories[0]}>
+                  <TabsList className="mb-3 h-auto flex-wrap">
+                    {categories.map((c) => (
+                      <TabsTrigger key={c} value={c} className="text-xs">
+                        {c}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  {categories.map((c) => (
+                    <TabsContent key={c} value={c} className="flex flex-col gap-2">
+                      {grouped[c].map((ex, i) => (
+                        <button
+                          key={i}
+                          onClick={() => runAction(ex.action)}
+                          disabled={loading}
+                          className="rounded-md border bg-card px-3 py-2 text-left font-mono text-xs transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+                        >
+                          <span className="text-muted-foreground">{ex.action.tool}:</span>{" "}
+                          {JSON.stringify(ex.action.params)}
+                        </button>
+                      ))}
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Propose your own</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="tool">Tool</Label>
+                  <Input id="tool" className="font-mono" value={custom.tool} onChange={(e) => setCustom({ ...custom, tool: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="params">Params (JSON)</Label>
+                  <Textarea id="params" className="font-mono" rows={2} value={custom.params} onChange={(e) => setCustom({ ...custom, params: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="context">Context (optional)</Label>
+                  <Textarea id="context" rows={2} value={custom.context} onChange={(e) => setCustom({ ...custom, context: e.target.value })} placeholder="Surrounding conversation context, if any" />
+                </div>
+                <Button onClick={runCustom} disabled={loading} className="w-full">
+                  {loading && <Loader2 className="size-4 animate-spin" />}
+                  Evaluate
+                </Button>
+                {error && <p className="text-sm text-critical">{error}</p>}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-2">
+            {result ? (
+              <ResultCard result={result} />
+            ) : (
+              <Card className="flex h-full min-h-48 items-center justify-center text-sm text-muted-foreground">
+                Run a demo action to see a decision here.
+              </Card>
+            )}
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent decisions</CardTitle>
+            <VerdictDistribution counts={stats.counts} />
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Verdict</TableHead>
+                  <TableHead>Tool</TableHead>
+                  <TableHead>
+                    <span className="inline-flex items-center gap-1">
+                      Source
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="size-3 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>"rule" = free hard-rule prefilter, "model" = Jev call</TooltipContent>
+                      </Tooltip>
+                    </span>
+                  </TableHead>
+                  <TableHead>Confidence</TableHead>
+                  <TableHead>Latency</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {decisions.map((d, i) => (
-                  <tr key={i} className="border-t">
-                    <td className="px-3 py-2">
-                      <VerdictBadge verdict={d.verdict} />
-                    </td>
-                    <td className="px-3 py-2 font-mono">{d.action.tool}</td>
-                    <td className="px-3 py-2 text-gray-500">{d.source}</td>
-                    <td className="px-3 py-2">{(d.confidence * 100).toFixed(0)}%</td>
-                    <td className="px-3 py-2 text-gray-500">{d.latency_ms.toFixed(1)}ms</td>
-                  </tr>
+                  <TableRow key={i}>
+                    <TableCell>
+                      <StatusBadge verdict={d.verdict} />
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{d.action.tool}</TableCell>
+                    <TableCell className="text-muted-foreground">{d.source}</TableCell>
+                    <TableCell className="font-mono text-xs">{(d.confidence * 100).toFixed(0)}%</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{d.latency_ms.toFixed(1)}ms</TableCell>
+                  </TableRow>
                 ))}
                 {decisions.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-gray-400">
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                       No decisions yet — try a demo action.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
