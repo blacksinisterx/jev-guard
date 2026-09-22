@@ -99,6 +99,10 @@ Next.js-free static frontend (Vite build) + FastAPI backend, both fit on Vercel:
 
 ## Screenshots
 
+**Demo flow** — a dangerous command caught instantly by the hard-rule prefilter, then a prompt-injection attempt caught by Jev's reasoning (`injection_suspected probability=0.81`), then a safe command let through:
+
+![JevGuard demo flow](docs/demo.gif)
+
 **Dashboard** — stat tiles, tabbed demo scenarios, live decision panel with confidence bar, verdict distribution + decision log:
 
 ![JevGuard dashboard](docs/dashboard.png)

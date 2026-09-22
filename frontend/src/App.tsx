@@ -131,6 +131,10 @@ export default function App() {
     [examples],
   );
   const categories = Object.keys(grouped);
+  const [activeCategory, setActiveCategory] = useState<string>("");
+  useEffect(() => {
+    if (!activeCategory && categories.length > 0) setActiveCategory(categories[0]);
+  }, [categories, activeCategory]);
 
   const stats = useMemo(() => {
     const total = decisions.length;
@@ -187,7 +191,7 @@ export default function App() {
                 <CardDescription>Seeded scenarios covering the categories JevGuard is meant to catch.</CardDescription>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue={categories[0]}>
+                <Tabs value={activeCategory} onValueChange={setActiveCategory}>
                   <TabsList className="mb-3 h-auto flex-wrap">
                     {categories.map((c) => (
                       <TabsTrigger key={c} value={c} className="text-xs">
