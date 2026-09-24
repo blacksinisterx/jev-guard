@@ -1,6 +1,17 @@
 import os
 
-JEV_PROVIDER = os.environ.get("JEV_PROVIDER", "mock")
-JEV_MODEL = os.environ.get("JEV_MODEL", "jev-latest")
-JEV_BLOCK_ABOVE = float(os.environ.get("JEV_BLOCK_ABOVE", "0.75"))
-JEV_ALLOW_BELOW = float(os.environ.get("JEV_ALLOW_BELOW", "0.25"))
+
+def _env(key: str, default: str) -> str:
+    """Treats a present-but-blank env var the same as an absent one.
+    os.environ.get(key, default) only falls back when the key is missing
+    entirely -- a blank value (e.g. from a dashboard env var accidentally
+    set with no value) passes straight through and breaks whatever parses
+    it. Confirmed this actually happens, not just theoretical."""
+    val = os.environ.get(key, "").strip()
+    return val or default
+
+
+JEV_PROVIDER = _env("JEV_PROVIDER", "mock")
+JEV_MODEL = _env("JEV_MODEL", "jev-latest")
+JEV_BLOCK_ABOVE = float(_env("JEV_BLOCK_ABOVE", "0.75"))
+JEV_ALLOW_BELOW = float(_env("JEV_ALLOW_BELOW", "0.25"))

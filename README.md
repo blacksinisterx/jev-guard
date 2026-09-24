@@ -95,9 +95,11 @@ Covers the hard-rule prefilter, the threshold policy's verdict mapping, and the 
 
 Deploys as a single Vercel project — import this repo, no configuration needed. `vercel.json` uses Vercel's explicit `builds`/`routes` config: it builds the Vite frontend as the static site and deploys `api/index.py` as a Python function, routing `/api/*` to the function and everything else to the built frontend.
 
-Two things that took a few iterations to get right, worth knowing if you fork this:
+Several things that took a few iterations to get right, worth knowing if you fork this:
 - **`api/app` is a real copy of `backend/app`, not an import across directories.** The function originally did `sys.path.insert(...)` to reach into the sibling `backend/` folder — works locally, but Vercel's Python bundler doesn't reliably include files outside a function's own directory, which is what actually caused the first deploy's 500 errors. Run `scripts/sync-api.sh` after changing anything in `backend/app/` and before deploying, or the live site serves stale logic.
+- **`api/index.py` explicitly adds its own directory to `sys.path`.** Vercel loads it via `importlib`, not as a directly-run script — Python doesn't auto-add the file's own directory to the path for that loading mechanism. A local test can pass anyway if it happens to run from within `api/` (the shell's cwd fills the gap `importlib` doesn't), which is exactly how the previous fix's local verification gave a false pass.
 - **Static routes point at the real build output path** (`/frontend/dist/...`), not an assumed root — `@vercel/static-build` keeps the source directory in the output path, so a route like `dest: "/index.html"` silently 404s.
+- **`config.py` treats a present-but-empty env var the same as an unset one.** `os.environ.get(key, default)` only falls back when the key is missing entirely; a blank value (e.g. an env var added in the Vercel dashboard with no value typed in) passes straight through and crashed `float()` in production. Confirmed, not hypothetical.
 
 `api/index.py` mounts the app under `/api` with zero route changes in `app/main.py` itself, so the frontend's relative `/api/*` calls work on the same domain with no separate API URL to configure.
 
