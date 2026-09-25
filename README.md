@@ -127,6 +127,10 @@ The decision log is in-memory by design (a demo dashboard doesn't need persisten
 
 ![JevGuard dashboard, light mode](docs/dashboard-light.png)
 
+**Live Jev output** — same prompt-injection example, `JEV_PROVIDER=jev_agent` against the real API instead of mock: Jev genuinely reads through the "already approved" social-engineering context and calls it `risk_category=dangerous (p=0.99)`, `injection_suspected=0.98`, real ~977ms latency:
+
+![Live block decision using the real jev_agent provider, prompt-injection example](docs/prompt-injection-live.png)
+
 ## Limitations
 
 - Mock provider's heuristics are keyword-based, not a real model — good enough to demo the architecture, not a claim about real Jev's accuracy.
