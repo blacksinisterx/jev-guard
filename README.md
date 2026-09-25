@@ -111,7 +111,7 @@ The decision log is in-memory by design (a demo dashboard doesn't need persisten
 
 ## Screenshots
 
-**Demo flow** — a dangerous command caught instantly by the hard-rule prefilter, then a prompt-injection attempt caught by Jev's reasoning (`injection_suspected probability=0.81`), then a safe command let through:
+**Demo flow**, genuinely live (`JEV_PROVIDER=jev_agent`, not mock) — a dangerous command caught instantly by the hard-rule prefilter (0 Jev calls), then a prompt-injection attempt caught by real Jev reasoning (`risk_category=dangerous p=0.99`), then a third command real Jev independently allows (`sensitive_data=0.17`, 83% confidence):
 
 ![JevGuard demo flow](docs/demo.gif)
 
